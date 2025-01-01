@@ -1,0 +1,2 @@
+# golang-katas
+practicing golang
