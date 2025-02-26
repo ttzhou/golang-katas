@@ -83,7 +83,7 @@ func (dll *LinkedList[T]) insertNode(pos int, node *Node[T]) (*Node[T], error) {
 		cur.prev, cur.prev.next, node.prev, node.next = node, node, cur.prev, cur
 	} else {
 		cur := &dll.headstub
-		for i := 0; i < pos; i++ {
+		for range pos {
 			cur = cur.next
 		}
 		cur.next, cur.next.prev, node.next, node.prev = node, node, cur.next, cur
