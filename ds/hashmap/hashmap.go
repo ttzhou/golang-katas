@@ -3,7 +3,7 @@ package hashmap
 import (
 	"encoding/json"
 	"golang-katas/ds/linkedlist/doublylinkedlist"
-	"hash/fnv"
+	"hash/maphash"
 	"iter"
 	"maps"
 	"math"
@@ -37,22 +37,22 @@ func nextPrime(n int) int {
 	}
 }
 
-type entry[K string, V any] struct {
+type entry[K comparable, V any] struct {
 	key K
 	val V
 }
 
-// HashMap is an implementation of a hash map using the FNV-1a algorithm.
-type HashMap[K string, V any] struct {
+// HashMap is an implementation of a hash map using the standard library's
+// maphash package.
+type HashMap[K comparable, V any] struct {
+	seed                maphash.Seed
 	buckets             []*doublylinkedlist.LinkedList[*entry[K, V]]
 	NumElements         int
 	loadFactorThreshold float64
 }
 
-func (hm HashMap[K, V]) hash(key K, size uint32) uint {
-	hashVal := fnv.New32a()
-	hashVal.Write([]byte(key))
-	return uint(hashVal.Sum32() % size)
+func (hm HashMap[K, V]) hash(key K, size uint64) uint {
+	return uint(maphash.Comparable(hm.seed, key) % size)
 }
 
 // Size returns the number of elements (buckets) in the underlying slice of
@@ -81,7 +81,7 @@ func (hm *HashMap[K, V]) resize() {
 	}
 	for i := range curSize {
 		for entry := range hm.buckets[i].IterVals() {
-			hash := hm.hash(entry.key, uint32(newSize))
+			hash := hm.hash(entry.key, uint64(newSize))
 			newBuckets[hash].Append(entry)
 		}
 	}
@@ -92,7 +92,7 @@ func (hm *HashMap[K, V]) resize() {
 // the key key.
 func (hm *HashMap[K, V]) Put(key K, val V) {
 	entry := entry[K, V]{key, val}
-	hash := hm.hash(key, uint32(len(hm.buckets)))
+	hash := hm.hash(key, uint64(len(hm.buckets)))
 	bucketList := hm.buckets[hash]
 	for entry := range bucketList.IterVals() {
 		if entry.key == key {
@@ -114,7 +114,7 @@ func (hm *HashMap[K, V]) Put(key K, val V) {
 func (hm *HashMap[K, V]) Get(key K) (V, bool) {
 	var val V
 	found := false
-	hash := hm.hash(key, uint32(len(hm.buckets)))
+	hash := hm.hash(key, uint64(len(hm.buckets)))
 	for entry := range hm.buckets[hash].IterVals() {
 		if entry.key == key {
 			val = entry.val
@@ -132,7 +132,7 @@ func (hm *HashMap[K, V]) Get(key K) (V, bool) {
 // indicating it could not be found.
 func (hm *HashMap[K, V]) Pop(key K) (V, bool) {
 	idx := -1
-	hash := hm.hash(key, uint32(len(hm.buckets)))
+	hash := hm.hash(key, uint64(len(hm.buckets)))
 	list := hm.buckets[hash]
 	for entry := range list.IterVals() {
 		idx++
@@ -175,12 +175,13 @@ func (hm HashMap[K, V]) String() string {
 
 // NewHashMap initializes a HashMap with defaultSize buckets,
 // and returns a pointer to it.
-func NewHashMap[K string, V any]() *HashMap[K, V] {
+func NewHashMap[K comparable, V any]() *HashMap[K, V] {
 	buckets := make([]*doublylinkedlist.LinkedList[*entry[K, V]], defaultSize)
 	for i := range len(buckets) {
 		buckets[i] = doublylinkedlist.New[*entry[K, V]]()
 	}
 	return &HashMap[K, V]{
+		seed:                maphash.MakeSeed(),
 		buckets:             buckets,
 		loadFactorThreshold: defaultLoadFactorThreshold,
 	}
